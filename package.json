@@ -1,0 +1,14 @@
+{
+  "name": "blue-blog",
+  "version": "1.0.0",
+  "description": "纯 Node.js 从零实现的博客（蔚蓝档案主题）：文章/评论/商店/抽奖/主题系统/komari探针/MC状态",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "dependencies": {},
+  "license": "MIT"
+}

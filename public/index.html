@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>蔚蓝博客 · Blue Archive</title>
+<link rel="stylesheet" href="/style.css">
+<style id="userTheme"></style>
+</head>
+<body>
+<header>
+  <h1 class="logo"><span class="halo"></span>蔚蓝博客<small>Sensei ✦</small></h1>
+  <nav>
+    <button data-tab="posts" class="active">文章</button>
+    <button data-tab="shop">商店</button>
+    <button data-tab="lottery">抽奖</button>
+    <button data-tab="mc">MC状态</button>
+    <button data-tab="themes">主题</button>
+    <button data-tab="probe">机器状态</button>
+    <button id="navMachines" class="machchip" title="komari 节点在线情况">🖥 --</button>
+    <button data-tab="auth" id="navAuth">登录/注册</button>
+    <span id="userBox"></span>
+  </nav>
+</header>
+
+<main>
+  <!-- 登录/注册（导航栏标签页） -->
+  <section id="authPanel" class="card hidden" style="max-width:380px;margin:40px auto">
+    <h2>🔑 登录 / 注册</h2>
+    <input id="authUser" placeholder="用户名">
+    <input id="authPass" type="password" placeholder="密码">
+    <div class="row">
+      <button id="btnLogin" class="primary">登录</button>
+      <button id="btnRegister">注册</button>
+    </div>
+    <p class="hint">注册即送 100 金币，可在商店消费、参与抽奖</p>
+  </section>
+
+  <!-- 文章列表 + 发布 -->
+  <section id="postsPanel" class="hidden">
+    <div id="tagBar" class="tagbar"></div>
+    <div id="postList"></div>
+    <div id="editorCard" class="card hidden">
+      <h2 id="editorTitle">写文章</h2>
+      <input id="postTitle" placeholder="标题">
+      <textarea id="postContent" rows="6" placeholder="内容..."></textarea>
+      <div class="row">
+        <input id="postTags" placeholder="标签（逗号分隔）" style="flex:1">
+        <input id="postCategory" placeholder="分类" style="flex:1">
+      </div>
+      <div class="row">
+        <button id="btnPublish">发布</button>
+        <button id="btnCancelEdit" class="secondary hidden">取消</button>
+      </div>
+    </div>
+    <button id="btnNewPost" class="primary hidden">✏️ 写文章</button>
+  </section>
+
+  <!-- 文章详情 -->
+  <section id="postDetail" class="hidden"></section>
+
+  <!-- 商店 -->
+  <section id="shopPanel" class="hidden">
+    <p id="shopCoins"></p>
+    <div id="shopList"></div>
+    <h3>我的订单</h3>
+    <div id="orderList"></div>
+  </section>
+
+  <!-- 抽奖 -->
+  <section id="lotteryPanel" class="hidden">
+    <div class="card" style="text-align:center">
+      <h2>🎰 幸运抽奖</h2>
+      <p class="hint">每次消耗 20 金币 · 抽中头衔会覆盖当前头衔</p>
+      <div id="poolList" class="pool"></div>
+      <button id="btnDraw" class="primary" style="font-size:1.1rem;padding:12px 40px">🎲 抽一次（🪙20）</button>
+      <p id="drawResult" style="font-size:1.2rem;margin-top:14px;min-height:1.6em"></p>
+    </div>
+    <div class="card">
+      <h3>我的抽奖记录</h3>
+      <div id="drawHistory"></div>
+    </div>
+  </section>
+
+  <!-- 主题系统 -->
+  <section id="themesPanel" class="hidden">
+    <div id="themeList"></div>
+    <div id="themeEditor" class="card hidden">
+      <h3 id="themeEditorTitle">编写主题</h3>
+      <input id="themeName" placeholder="主题名称">
+      <textarea id="themeCSS" rows="12" spellcheck="false" placeholder="/* 在这里编写你的 CSS，可覆盖变量：--ba-blue 等 */&#10;:root { --ba-blue: #f06292; }&#10;body { background: pink; }"></textarea>
+      <div class="row">
+        <button id="btnThemeSave" class="primary">保存主题</button>
+        <button id="btnThemePreview" class="secondary">👁 实时预览</button>
+        <button id="btnThemeReset" class="secondary">还原当前主题</button>
+        <button id="btnThemeCancel" class="secondary">收起</button>
+      </div>
+      <p class="hint">预览仅对本机生效；保存后所有人可在列表中应用你的主题。支持覆盖 CSS 变量（--ba-blue、--ba-text 等）或写任意选择器。</p>
+    </div>
+  </section>
+
+  <!-- 探针（komari） -->
+  <section id="probePanel" class="hidden">
+    <div class="row" style="justify-content:space-between">
+      <p class="hint" id="probeHint" style="margin:0"></p>
+      <button id="btnRefreshProbe">🔄 刷新</button>
+    </div>
+    <div id="probeList"></div>
+  </section>
+
+  <!-- MC -->
+  <section id="mcPanel" class="hidden">
+    <button id="btnRefreshMc">🔄 刷新</button>
+    <div id="mcList"></div>
+  </section>
+</main>
+
+<footer>✦ Blue Archive 风格 · 纯 Node.js 从零实现 · 无任何框架 ✦</footer>
+<script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+services:
+  blog:
+    build: .
+    container_name: blue-blog
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - PORT=3000
+      # komari 探针面板地址（也可在博客后台"设置"里配置）
+      # - KOMARI_URL=http://127.0.0.1:8080
+      # MC 服务器查询列表，逗号分隔
+      # - MC_SERVERS=mc.example.com:25565,mc2.example.com:25565
