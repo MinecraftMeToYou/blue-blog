@@ -136,13 +136,34 @@ module.exports.register = (router) => {
 
   router.put('/api/admin/settings', (ctx) => {
     if (!requireAdmin(ctx)) return;
-    const { komari_url } = ctx.body;
+    const { komari_url, probe_sources } = ctx.body;
+
     if (komari_url !== undefined) {
       const v = String(komari_url).trim();
       if (v && !/^https?:\/\//.test(v)) return send(ctx, 400, { error: '地址需以 http:// 或 https:// 开头' });
       const existing = db.find('settings', (s) => s.key === 'komari_url');
       if (existing) db.update('settings', existing.id, { value: v });
       else db.insert('settings', { key: 'komari_url', value: v });
+    }
+
+    // 探针数据源列表（多面板：komari / nezha / serverstatus）
+    if (probe_sources !== undefined) {
+      if (!Array.isArray(probe_sources)) return send(ctx, 400, { error: 'probe_sources 需为数组' });
+      const clean = probe_sources
+        .filter((s) => s && String(s.url || '').trim())
+        .map((s) => ({
+          name: String(s.name || '').trim().slice(0, 50) || String(s.provider || 'komari'),
+          provider: String(s.provider || 'komari').toLowerCase(),
+          url: String(s.url).trim(),
+          token: String(s.token || '').trim().slice(0, 200),
+        }));
+      for (const c of clean) {
+        if (!/^https?:\/\//.test(c.url)) return send(ctx, 400, { error: `数据源 ${c.name} 的地址需以 http:// 或 https:// 开头` });
+      }
+      const row = db.find('settings', (s) => s.key === 'probe_sources');
+      const val = JSON.stringify(clean);
+      if (row) db.update('settings', row.id, { value: val });
+      else db.insert('settings', { key: 'probe_sources', value: val });
     }
     send(ctx, 200, { ok: true });
   });

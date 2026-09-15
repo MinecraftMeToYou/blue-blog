@@ -47,17 +47,62 @@ function showTab(name) {
   loaders[name]();
 }
 
-// ---- 设置（komari 探针） ----
+// ---- 设置（探针数据源：komari / 哪吒 / ServerStatus） ----
+const PROVIDERS = [['komari', 'komari'], ['nezha', 'Nezha v0'], ['serverstatus', 'ServerStatus']];
+let srcList = [];
+
 async function loadSettings() {
   const { settings } = await api('/api/admin/settings');
-  $('komariUrl').value = settings.komari_url || '';
+  srcList = [];
+  try {
+    const p = settings.probe_sources ? JSON.parse(settings.probe_sources) : null;
+    if (Array.isArray(p)) srcList = p;
+  } catch {}
+  if (!srcList.length && settings.komari_url) {
+    srcList = [{ name: 'komari', provider: 'komari', url: settings.komari_url, token: '' }];
+  }
+  if (!srcList.length) srcList = [{ name: '', provider: 'komari', url: '', token: '' }];
+  renderSources();
+
+  $('btnAddSrc').onclick = () => {
+    srcList.push({ name: '', provider: 'komari', url: '', token: '' });
+    renderSources();
+  };
   $('btnSaveSettings').onclick = async () => {
     try {
-      await api('/api/admin/settings', { method: 'PUT', body: { komari_url: $('komariUrl').value } });
-      $('settingsMsg').textContent = '已保存 ✓';
+      await api('/api/admin/settings', {
+        method: 'PUT',
+        body: { probe_sources: srcList.filter((s) => s.url.trim()), komari_url: '' },
+      });
+      $('settingsMsg').textContent = '已保存';
       setTimeout(() => ($('settingsMsg').textContent = ''), 2000);
     } catch (e) { $('settingsMsg').textContent = e.message; }
   };
+}
+
+function renderSources() {
+  $('srcRows').innerHTML = srcList.map((s, i) => `
+    <div class="row src-row" data-i="${i}" style="flex-wrap:nowrap">
+      <select data-f="provider" style="width:130px">
+        ${PROVIDERS.map(([v, label]) => `<option value="${v}" ${s.provider === v ? 'selected' : ''}>${label}</option>`).join('')}
+      </select>
+      <input data-f="name" placeholder="显示名" value="${esc(s.name || '')}" style="width:110px">
+      <input data-f="url" placeholder="http://面板地址" value="${esc(s.url || '')}" style="flex:1">
+      <input data-f="token" placeholder="Token（可选）" value="${esc(s.token || '')}" style="width:150px">
+      <button class="danger" data-del="${i}">删除</button>
+    </div>`).join('') || '<p class="hint">暂无数据源</p>';
+
+  $('srcRows').querySelectorAll('.src-row').forEach((row) => {
+    const i = Number(row.dataset.i);
+    row.querySelectorAll('[data-f]').forEach((el) => {
+      el.oninput = () => { srcList[i][el.dataset.f] = el.value; };
+      el.onchange = el.oninput;
+    });
+    row.querySelector('button[data-del]').onclick = () => {
+      srcList.splice(i, 1);
+      renderSources();
+    };
+  });
 }
 document.querySelectorAll('#tabs button[data-tab]').forEach((b) =>
   b.addEventListener('click', () => showTab(b.dataset.tab)));

@@ -3,51 +3,56 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>沙勒办公室 · 管理后台</title>
+<title>blue-blog 后台</title>
 <link rel="stylesheet" href="/style.css">
 </head>
-<body class="admin">
+<body>
 <header>
-  <h1 class="logo"><span class="halo"></span>沙勒办公室<small>ADMIN</small></h1>
-  <nav id="tabs" class="hidden">
-    <button data-tab="overview" class="active">概览</button>
-    <button data-tab="posts">文章</button>
-    <button data-tab="comments">评论</button>
-    <button data-tab="users">用户</button>
-    <button data-tab="shop">商品</button>
-    <button data-tab="settings">设置</button>
-    <button id="btnLogout" class="danger">退出</button>
-  </nav>
+  <div class="wrap head-inner">
+    <button class="logo" onclick="location.reload()">blue-blog 后台</button>
+    <nav class="nav hidden" id="tabs">
+      <button data-tab="overview" class="active">概览</button>
+      <button data-tab="posts">文章</button>
+      <button data-tab="comments">评论</button>
+      <button data-tab="users">用户</button>
+      <button data-tab="shop">商品</button>
+      <button data-tab="settings">设置</button>
+      <button id="btnLogout" class="danger">退出</button>
+    </nav>
+  </div>
 </header>
 
-<main>
-  <section id="loginCard" class="card" style="max-width:360px;margin:60px auto">
-    <h2>管理员登录</h2>
+<div class="wrap">
+  <div id="loginCard" class="box auth-box">
+    <h3>管理员登录</h3>
     <input id="aUser" placeholder="用户名">
     <input id="aPass" type="password" placeholder="密码">
     <button id="btnAdminLogin" class="primary" style="width:100%">登录</button>
     <p class="hint" id="loginErr"></p>
-  </section>
+  </div>
 
-  <section id="dash" class="hidden">
+  <div id="dash" class="hidden">
     <div id="tabOverview">
-      <div id="statCards" class="statcards"></div>
+      <div id="statCards" class="statcards" style="margin-top:20px"></div>
     </div>
     <div id="tabPosts" class="hidden"></div>
     <div id="tabComments" class="hidden"></div>
     <div id="tabUsers" class="hidden"></div>
     <div id="tabShop" class="hidden"></div>
     <div id="tabSettings" class="hidden">
-      <div class="card">
-        <h3>探针（komari）设置</h3>
-        <p class="hint">填写 komari 监控面板地址，博客"探针"页将展示其节点数据。komari 部署方法见 github.com/komari-monitor/komari</p>
-        <input id="komariUrl" placeholder="例如 http://your-komari-panel.com">
-        <div class="row"><button id="btnSaveSettings" class="primary">保存</button></div>
+      <div class="box" style="margin-top:20px">
+        <h3>探针数据源</h3>
+        <p class="hint">支持 komari、哪吒（Nezha v0）、ServerStatus（Hotaru）。可同时添加多个面板。</p>
+        <div id="srcRows"></div>
+        <div class="row">
+          <button id="btnAddSrc">添加数据源</button>
+          <button id="btnSaveSettings" class="primary">保存</button>
+        </div>
         <p class="hint" id="settingsMsg"></p>
       </div>
     </div>
-  </section>
-</main>
+  </div>
+</div>
 
 <script src="/admin.js"></script>
 </body>

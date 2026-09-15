@@ -5,7 +5,10 @@ const lotteryMod = require('./lottery');
 
 function withAuthor(post) {
   const author = db.find('users', (u) => u.id === post.authorId);
-  return Object.assign({}, post, { authorName: author ? author.username : '佚名' });
+  return Object.assign({}, post, {
+    authorName: author ? author.username : '佚名',
+    commentCount: db.filter('comments', (c) => c.postId === post.id).length,
+  });
 }
 
 module.exports.register = (router) => {

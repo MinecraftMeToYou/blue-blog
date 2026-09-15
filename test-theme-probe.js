@@ -20,16 +20,24 @@ function check(name, ok, detail = '') {
   results.push(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? '  (' + detail + ')' : ''}`);
 }
 
-// 模拟一个 komari 面板（/api/clients）
+// 模拟探针面板：komari / 哪吒 / ServerStatus
 const mockKomari = http.createServer((req, res) => {
+  const ok = (obj) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
   if (req.url === '/api/clients') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      clients: [
-        { name: 'Tokyo-01', status: 'online', os: 'linux', arch: 'amd64', cpu_percent: 12.5, mem_percent: 45.2, disk_percent: 60, net_in_speed: 204800, net_out_speed: 102400, uptime: 86400 * 3 },
-        { name: 'US-02', status: 'offline', os: 'windows', arch: 'amd64' },
-      ],
-    }));
+    ok({ clients: [
+      { name: 'Tokyo-01', status: 'online', os: 'linux', arch: 'amd64', cpu_percent: 12.5, mem_percent: 45.2, disk_percent: 60, net_in_speed: 204800, net_out_speed: 102400, uptime: 86400 * 3 },
+      { name: 'US-02', status: 'offline', os: 'windows', arch: 'amd64' },
+    ] });
+  } else if (req.url.startsWith('/api/v1/server/list')) {
+    ok({ code: 0, result: [
+      { name: 'Nezha-HK', online4: true, host: { Platform: 'linux', PlatformVersion: '22.04', CPU: 'x64' },
+        status: { CPU: 7.5, MemUsed: 1024 * 1024 * 512, MemTotal: 1024 * 1024 * 1024, DiskUsed: 10, DiskTotal: 100, NetInSpeed: 500, NetOutSpeed: 250, Uptime: 3600 * 5 } },
+      { name: 'Nezha-DE', online4: false, host: { Platform: 'debian' }, status: {} },
+    ] });
+  } else if (req.url === '/json/stats.json') {
+    ok({ servers: [
+      { name: 'SS-TW', type: 'centos', online: '1', uptime: String(86400 * 1e9), cpu: 3.3, memory_total: 2048, memory_used: 1024, disk_total: 40, disk_used: 10, rx: 900, tx: 450 },
+    ] });
   } else { res.writeHead(404); res.end(); }
 });
 
@@ -57,10 +65,35 @@ const mockKomari = http.createServer((req, res) => {
     && s0.memPercent === 45.2 && s0.netIn === 204800 && s0.uptime === 86400 * 3);
   check('离线节点归一化', s1.name === 'US-02' && s1.online === false);
 
-  // 坏地址容错
-  await api('/api/admin/settings', { method: 'PUT', body: { komari_url: 'http://localhost:1' } });
+  // ---- 多探针数据源：komari + 哪吒 + ServerStatus ----
+  r = await api('/api/admin/settings', {
+    method: 'PUT',
+    body: { probe_sources: [
+      { name: 'komari主面板', provider: 'komari', url: 'http://localhost:18923', token: '' },
+      { name: '哪吒面板', provider: 'nezha', url: 'http://localhost:18923', token: '' },
+      { name: 'ServerStatus', provider: 'serverstatus', url: 'http://localhost:18923', token: '' },
+    ] },
+  });
+  check('保存多探针数据源', r.status === 200);
   r = await api('/api/probe/servers');
-  check('komari 不可达时优雅降级', r.status === 200 && r.data.error && r.data.error.includes('获取失败'));
+  const srcs = r.data.sources;
+  check('三个数据源全部成功', r.data.configured && srcs.length === 3 && srcs.every((s) => s.ok),
+    srcs.map((s) => `${s.provider}:${s.servers.length}`).join(' | '));
+  const nz = srcs.find((s) => s.provider === 'nezha').servers;
+  check('哪吒归一化', nz[0].name === 'Nezha-HK' && nz[0].online === true && nz[0].cpuPercent === 7.5
+    && Math.round(nz[0].memPercent) === 50 && nz[0].uptime === 18000
+    && nz[1].online === false, JSON.stringify(nz[0]).slice(0, 100));
+  const ss = srcs.find((s) => s.provider === 'serverstatus').servers;
+  check('ServerStatus 归一化', ss[0].name === 'SS-TW' && ss[0].online === true && ss[0].uptime === 86400
+    && ss[0].memPercent === 50 && ss[0].netIn === 900);
+  // 非法数据源被拒
+  r = await api('/api/admin/settings', { method: 'PUT', body: { probe_sources: [{ provider: 'komari', url: 'ftp://x' }] } });
+  check('非法数据源地址被拒', r.status === 400);
+
+  // 坏地址容错
+  await api('/api/admin/settings', { method: 'PUT', body: { probe_sources: [{ provider: 'komari', url: 'http://localhost:1' }] } });
+  r = await api('/api/probe/servers');
+  check('探针不可达时优雅降级', r.status === 200 && r.data.sources[0].ok === false && r.data.sources[0].error);
 
   // ---- 主题系统 ----
   r = await api('/api/themes');
@@ -100,12 +133,12 @@ const mockKomari = http.createServer((req, res) => {
   r = await api('/api/themes/1', { method: 'DELETE' });
   check('预置主题不可删', r.status === 403);
 
-  // 清理：删测试用户（级联其数据）、清测试主题、还原 komari 设置与 admin 金币
+  // 清理：删测试用户（级联其数据）、清测试主题、还原探针设置与 admin 金币
   const users = (await api('/api/admin/users')).data.users;
   const tu = users.find((u) => u.username === 'thememan');
   if (tu) await api('/api/admin/users/' + tu.id, { method: 'DELETE' });
   await api('/api/themes/' + tid, { method: 'DELETE' }).catch(() => {});
-  await api('/api/admin/settings', { method: 'PUT', body: { komari_url: '' } });
+  await api('/api/admin/settings', { method: 'PUT', body: { komari_url: '', probe_sources: [] } });
   const admin = users.find((u) => u.username === 'admin');
   if (admin) await api('/api/admin/users/' + admin.id, { method: 'PUT', body: { coins: 999 } });
 

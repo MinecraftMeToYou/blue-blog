@@ -10,7 +10,7 @@
 - 商店：金币购买商品，有订单记录
 - 抽奖：全局抽奖，以及文章抽奖（作者发起，读者参与，可撤销退款）
 - 主题：在线写 CSS 换肤，实时预览
-- 服务器监控：对接 [komari](https://github.com/komari-monitor/komari) 面板
+- 服务器监控：对接 komari、哪吒（Nezha v0）、ServerStatus（Hotaru），可同时添加多个面板
 - Minecraft 服务器在线人数查询（GS4 Query 协议）
 - 后台管理：文章、评论、用户、商品、系统设置
 
