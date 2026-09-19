@@ -58,17 +58,56 @@
     <p style="margin:16px 0"><button id="btnNewPost" class="primary hidden">+ 新话题</button></p>
   </section>
 
-  <!-- 登录/注册 -->
+  <!-- 登录/注册 / 个人设置 -->
   <section id="authPanel" class="hidden">
     <div class="box auth-box">
-      <h3>登录</h3>
-      <input id="authUser" placeholder="用户名">
-      <input id="authPass" type="password" placeholder="密码">
-      <div class="row">
-        <button id="btnLogin" class="primary">登录</button>
-        <button id="btnRegister">注册</button>
+      <div id="authForms">
+        <h3>登录</h3>
+        <input id="authUser" placeholder="用户名">
+        <input id="authPass" type="password" placeholder="密码">
+        <div class="row">
+          <button id="btnLogin" class="primary">登录</button>
+          <button id="btnRegister">注册</button>
+        </div>
+        <div class="row reg-extra hidden" id="regEmailRow"><input id="regEmail" placeholder="邮箱" style="flex:1"></div>
+        <div class="row reg-extra hidden" id="regPhoneRow"><input id="regPhone" placeholder="手机号" style="flex:1"></div>
+        <div class="row reg-extra hidden" id="regInviteRow"><input id="regInvite" placeholder="邀请码" style="flex:1"></div>
+        <p class="hint">没有账号？点「注册」，送 100 金币</p>
       </div>
-      <p class="hint">没有账号？点「注册」，送 100 金币</p>
+      <div id="profileBox" class="hidden">
+        <h3>个人设置 <span id="profLevel"></span></h3>
+        <p class="hint" id="profName"></p>
+        <h4 class="p-sec">邮箱</h4>
+        <div class="row" style="flex-wrap:nowrap">
+          <input id="profEmail" placeholder="邮箱地址" style="flex:1;margin:0">
+          <button id="btnProfEmailSend">发送验证码</button>
+        </div>
+        <div class="row" style="flex-wrap:nowrap">
+          <input id="profEmailCode" placeholder="6 位验证码" style="width:130px;margin:0">
+          <button id="btnProfEmailConfirm" class="primary">确认</button>
+          <span class="hint" id="profEmailState"></span>
+        </div>
+        <h4 class="p-sec">手机号</h4>
+        <div class="row" style="flex-wrap:nowrap">
+          <input id="profPhone" placeholder="手机号" style="flex:1;margin:0">
+          <button id="btnProfPhoneSend">发送验证码</button>
+        </div>
+        <div class="row" style="flex-wrap:nowrap">
+          <input id="profPhoneCode" placeholder="6 位验证码" style="width:130px;margin:0">
+          <button id="btnProfPhoneConfirm" class="primary">确认</button>
+          <span class="hint" id="profPhoneState"></span>
+        </div>
+        <h4 class="p-sec" id="qqSec">QQ 绑定</h4>
+        <div class="row" style="flex-wrap:nowrap" id="qqRow">
+          <input id="profQQ" placeholder="QQ 号" style="width:180px;margin:0">
+          <button id="btnProfQQ" class="primary">保存</button>
+          <span class="hint" id="profQQState"></span>
+        </div>
+        <div class="row" style="justify-content:space-between;margin-top:18px">
+          <button id="btnBackForum" class="link-btn">← 回到论坛</button>
+          <button id="btnProfLogout" class="danger">退出登录</button>
+        </div>
+      </div>
     </div>
   </section>
 

@@ -38,9 +38,9 @@ $('btnAdminLogin').onclick = async () => {
 $('btnLogout').onclick = async () => location.reload();
 
 // ---- 标签页 ----
-const loaders = { overview: loadOverview, posts: loadPosts, comments: loadComments, users: loadUsers, shop: loadShop, settings: loadSettings };
+const loaders = { overview: loadOverview, posts: loadPosts, comments: loadComments, users: loadUsers, invites: loadInvites, shop: loadShop, settings: loadSettings };
 function showTab(name) {
-  ['Overview', 'Posts', 'Comments', 'Users', 'Shop', 'Settings'].forEach((t) =>
+  ['Overview', 'Posts', 'Comments', 'Users', 'Invites', 'Shop', 'Settings'].forEach((t) =>
     $('tab' + t).classList.toggle('hidden', t.toLowerCase() !== name));
   document.querySelectorAll('#tabs button[data-tab]').forEach((b) =>
     b.classList.toggle('active', b.dataset.tab === name));
@@ -63,6 +63,70 @@ async function loadSettings() {
       $('siteMsg').textContent = '已保存';
       setTimeout(() => ($('siteMsg').textContent = ''), 2000);
     } catch (e) { $('siteMsg').textContent = e.message; }
+  };
+
+  // 注册开关
+  let reg = { requireInvite: false, verifyEmail: false, verifyPhone: false, qqBind: true };
+  try { reg = Object.assign(reg, JSON.parse(settings.reg || '{}')); } catch {}
+  $('regInvite').checked = !!reg.requireInvite;
+  $('regEmail').checked = !!reg.verifyEmail;
+  $('regPhone').checked = !!reg.verifyPhone;
+  $('regQQ').checked = reg.qqBind !== false;
+  $('btnSaveReg').onclick = async () => {
+    try {
+      await api('/api/admin/settings', {
+        method: 'PUT',
+        body: { reg: {
+          requireInvite: $('regInvite').checked,
+          verifyEmail: $('regEmail').checked,
+          verifyPhone: $('regPhone').checked,
+          qqBind: $('regQQ').checked,
+        } },
+      });
+      $('regMsg').textContent = '已保存';
+      setTimeout(() => ($('regMsg').textContent = ''), 2000);
+    } catch (e) { $('regMsg').textContent = e.message; }
+  };
+
+  // SMTP
+  let smtp = {};
+  try { smtp = JSON.parse(settings.smtp || '{}'); } catch {}
+  $('smtpHost').value = smtp.host || '';
+  $('smtpPort').value = smtp.port || '';
+  $('smtpSecure').checked = !!smtp.secure;
+  $('smtpUser').value = smtp.user || '';
+  $('smtpPass').value = smtp.pass || '';
+  $('smtpFrom').value = smtp.from || '';
+  $('btnSaveSmtp').onclick = async () => {
+    try {
+      await api('/api/admin/settings', {
+        method: 'PUT',
+        body: { smtp: {
+          host: $('smtpHost').value, port: Number($('smtpPort').value) || undefined,
+          secure: $('smtpSecure').checked, user: $('smtpUser').value,
+          pass: $('smtpPass').value, from: $('smtpFrom').value,
+        } },
+      });
+      $('smtpMsg').textContent = '已保存';
+      setTimeout(() => ($('smtpMsg').textContent = ''), 2000);
+    } catch (e) { $('smtpMsg').textContent = e.message; }
+  };
+  $('btnTestSmtp').onclick = async () => {
+    $('smtpMsg').textContent = '发送中...';
+    try {
+      await api('/api/admin/test-smtp', { method: 'POST', body: { to: $('smtpTestTo').value } });
+      $('smtpMsg').textContent = '测试邮件已发送 ✓';
+    } catch (e) { $('smtpMsg').textContent = '失败：' + e.message; }
+  };
+
+  // 短信通道
+  $('smsWebhook').value = settings.sms_webhook || '';
+  $('btnSaveSms').onclick = async () => {
+    try {
+      await api('/api/admin/settings', { method: 'PUT', body: { sms_webhook: $('smsWebhook').value } });
+      $('smsMsg').textContent = '已保存';
+      setTimeout(() => ($('smsMsg').textContent = ''), 2000);
+    } catch (e) { $('smsMsg').textContent = e.message; }
   };
 
   srcList = [];
@@ -218,12 +282,21 @@ async function loadComments() {
 
 // ---- 用户管理 ----
 async function loadUsers() {
-  const { users } = await api('/api/admin/users');
+  const { users, levelNames } = await api('/api/admin/users');
   $('tabUsers').innerHTML = `<table>
-    <tr><th>ID</th><th>用户名</th><th>金币</th><th>头衔</th><th>角色</th><th>操作</th></tr>
+    <tr><th>ID</th><th>用户名</th><th>等级</th><th>金币</th><th>头衔</th><th>角色</th><th>联系方式</th><th>操作</th></tr>
     ${users.map((u) => `<tr>
-      <td>${u.id}</td><td>${esc(u.username)}</td><td>${u.coins}</td>
+      <td>${u.id}</td><td>${esc(u.username)}</td>
+      <td><select data-level="${u.id}" style="width:110px">
+        ${[0, 1, 2, 3, 4].map((lv) => `<option value="${lv}" ${u.level === lv ? 'selected' : ''}>L${lv} ${levelNames[lv]}</option>`).join('')}
+      </select></td>
+      <td>${u.coins}</td>
       <td>${esc(u.title) || '—'}</td><td>${u.role === 'admin' ? '管理员' : '用户'}</td>
+      <td class="hint">
+        ${u.email ? (u.emailVerified ? '📧✓' : '📧✗') : ''} ${esc(u.email)}
+        ${u.phone ? (u.phoneVerified ? ' 📱✓' : ' 📱✗') : ''} ${esc(u.phone)}
+        ${u.qq ? ' 🐧' + esc(u.qq) : ''}
+      </td>
       <td>
         <button data-act="coins" data-id="${u.id}" data-cur="${u.coins}">金币</button>
         <button data-act="title" data-id="${u.id}" data-cur="${esc(u.title)}">头衔</button>
@@ -231,6 +304,12 @@ async function loadUsers() {
         <button class="danger" data-act="del" data-id="${u.id}">删除</button>
       </td>
     </tr>`).join('')}</table>`;
+  $('tabUsers').querySelectorAll('select[data-level]').forEach((sel) =>
+    sel.onchange = async () => {
+      try {
+        await api('/api/admin/users/' + sel.dataset.level, { method: 'PUT', body: { level: Number(sel.value) } });
+      } catch (e) { alert(e.message); loadUsers(); }
+    });
   $('tabUsers').querySelectorAll('button[data-act]').forEach((b) => {
     const id = b.dataset.id;
     b.onclick = async () => {
@@ -255,6 +334,34 @@ async function loadUsers() {
       } catch (e) { alert(e.message); }
     };
   });
+}
+
+// ---- 邀请码管理 ----
+async function loadInvites() {
+  const { invites } = await api('/api/admin/invites');
+  $('btnGenInvites').onclick = async () => {
+    try {
+      await api('/api/admin/invites', {
+        method: 'POST',
+        body: { count: Number($('invCount').value), maxUses: Number($('invUses').value), days: Number($('invDays').value) },
+      });
+      loadInvites();
+    } catch (e) { alert(e.message); }
+  };
+  $('inviteList').innerHTML = invites.length ? `<table>
+    <tr><th>邀请码</th><th>已用/上限</th><th>过期时间</th><th>创建时间</th><th>操作</th></tr>
+    ${invites.map((i) => `<tr>
+      <td><b>${esc(i.code)}</b></td>
+      <td>${i.uses}/${i.maxUses}</td>
+      <td>${i.expiresAt ? new Date(i.expiresAt).toLocaleString() : '永久'}</td>
+      <td>${new Date(i.createdAt).toLocaleString()}</td>
+      <td><button class="danger" data-del="${i.id}">删除</button></td>
+    </tr>`).join('')}</table>` : '<p class="hint">暂无邀请码</p>';
+  $('inviteList').querySelectorAll('button[data-del]').forEach((b) =>
+    b.onclick = async () => {
+      await api('/api/admin/invites/' + b.dataset.del, { method: 'DELETE' });
+      loadInvites();
+    });
 }
 
 // ---- 商品管理 ----

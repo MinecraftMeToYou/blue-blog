@@ -6,6 +6,7 @@ const path = require('path');
 const { Router } = require('./lib/router');
 const { Session } = require('./lib/session');
 const db = require('./lib/db');
+const settings = require('./lib/settings');
 
 const auth = require('./routes/auth');
 const posts = require('./routes/posts');
@@ -34,10 +35,18 @@ lottery.register(router);
 themes.register(router);
 probe.register(router);
 
-// 公开的站点信息（站名在后台「设置」里改）
+// 公开的站点信息（站名在后台「设置」里改；注册开关公开给注册表单）
 router.get('/api/site', (ctx) => {
-  const row = db.find('settings', (s) => s.key === 'site_name');
-  send(ctx.res, 200, { name: (row && row.value) || 'MinecraftMeToYou的私人博客' });
+  const reg = settings.reg();
+  send(ctx.res, 200, {
+    name: settings.siteName(),
+    reg: {
+      requireInvite: reg.requireInvite,
+      verifyEmail: reg.verifyEmail,
+      verifyPhone: reg.verifyPhone,
+      qqBind: reg.qqBind,
+    },
+  });
 });
 
 const MIME = {

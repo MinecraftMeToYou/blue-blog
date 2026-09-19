@@ -1,8 +1,12 @@
 // 管理后台 API：管理员可管理所有文章、评论、用户、商品
+const crypto = require('crypto');
 const db = require('../lib/db');
 const { hashPassword } = require('../lib/passwords');
 const { send, requireAdmin } = require('../lib/respond');
 const lotteryMod = require('./lottery');
+const settings = require('../lib/settings');
+const levels = require('../lib/levels');
+const { sendMail } = require('../lib/smtp');
 
 module.exports.register = (router) => {
   // 概览统计
@@ -17,6 +21,53 @@ module.exports.register = (router) => {
     });
   });
 
+  // ---- SMTP 测试 ----
+  router.post('/api/admin/test-smtp', async (ctx) => {
+    if (!requireAdmin(ctx)) return;
+    const cfg = settings.smtp();
+    if (!cfg) return send(ctx, 400, { error: '请先保存 SMTP 配置' });
+    try {
+      await sendMail(cfg, {
+        to: String(ctx.body.to || cfg.from),
+        subject: 'blue-blog SMTP 测试',
+        text: '这是一封测试邮件，收到说明 SMTP 配置成功。\n',
+      });
+      send(ctx, 200, { ok: true });
+    } catch (e) {
+      send(ctx, 502, { error: e.message });
+    }
+  });
+
+  // ---- 邀请码 ----
+  router.get('/api/admin/invites', (ctx) => {
+    if (!requireAdmin(ctx)) return;
+    send(ctx, 200, { invites: db.get('invites').slice().reverse() });
+  });
+
+  router.post('/api/admin/invites', (ctx) => {
+    if (!requireAdmin(ctx)) return;
+    const count = Math.min(20, Math.max(1, Number(ctx.body.count) || 1));
+    const maxUses = Math.min(999, Math.max(1, Number(ctx.body.maxUses) || 1));
+    const days = Math.max(0, Number(ctx.body.days) || 0);
+    const created = [];
+    for (let i = 0; i < count; i++) {
+      created.push(db.insert('invites', {
+        code: crypto.randomBytes(4).toString('hex').toUpperCase(),
+        maxUses, uses: 0,
+        expiresAt: days ? Date.now() + days * 86400000 : 0,
+        createdBy: ctx.user.userId,
+        createdAt: new Date().toISOString(),
+      }));
+    }
+    send(ctx, 201, { invites: created });
+  });
+
+  router.delete('/api/admin/invites/:id', (ctx) => {
+    if (!requireAdmin(ctx)) return;
+    if (!db.remove('invites', Number(ctx.params.id))) return send(ctx, 404, { error: '邀请码不存在' });
+    send(ctx, 200, { ok: true });
+  });
+
   // ---- 用户管理 ----
   router.get('/api/admin/users', (ctx) => {
     if (!requireAdmin(ctx)) return;
@@ -24,25 +75,35 @@ module.exports.register = (router) => {
       users: db.get('users').map((u) => ({
         id: u.id, username: u.username, coins: u.coins,
         title: u.title || '', role: u.role || 'user', createdAt: u.createdAt,
+        level: u.level || 0, manualLevel: u.manualLevel || 0,
+        email: u.email || '', emailVerified: !!u.emailVerified,
+        phone: u.phone || '', phoneVerified: !!u.phoneVerified,
+        qq: u.qq || '',
       })),
+      levelNames: levels.LEVELS.map((l) => l.name),
     });
   });
 
-  // 修改用户：金币 / 头衔 / 密码 / 角色
+  // 修改用户：金币 / 头衔 / 密码 / 角色 / 等级
   router.put('/api/admin/users/:id', (ctx) => {
     if (!requireAdmin(ctx)) return;
     const u = db.find('users', (x) => x.id === Number(ctx.params.id));
     if (!u) return send(ctx, 404, { error: '用户不存在' });
-    const { coins, title, password, role } = ctx.body;
+    const { coins, title, password, role, level } = ctx.body;
     const patch = {};
     if (coins !== undefined) patch.coins = Math.max(0, Number(coins) || 0);
     if (title !== undefined) patch.title = String(title);
     if (role !== undefined && u.id !== ctx.user.userId) patch.role = role === 'admin' ? 'admin' : 'user';
+    if (level !== undefined) {
+      const lv = Math.min(4, Math.max(0, Number(level) || 0));
+      patch.manualLevel = lv;
+    }
     if (password) {
       if (String(password).length < 6) return send(ctx, 400, { error: '密码至少 6 位' });
       Object.assign(patch, hashPassword(String(password)));
     }
     db.update('users', u.id, patch);
+    if (level !== undefined) levels.refreshLevel(u.id);
     send(ctx, 200, { ok: true });
   });
 
@@ -58,6 +119,7 @@ module.exports.register = (router) => {
     db.filter('draws', (d) => d.userId === id).forEach((d) => db.remove('draws', d.id));
     db.filter('themes', (x) => x.authorId === id && !x.isDefault).forEach((x) => db.remove('themes', x.id));
     db.filter('lotteries', (l) => l.authorId === id).forEach((l) => db.remove('lotteries', l.id));
+        db.filter('verifications', (v) => v.userId === id).forEach((v) => db.remove('verifications', v.id));
     db.remove('users', id);
     send(ctx, 200, { ok: true });
   });
@@ -136,13 +198,51 @@ module.exports.register = (router) => {
 
   router.put('/api/admin/settings', (ctx) => {
     if (!requireAdmin(ctx)) return;
-    const { komari_url, probe_sources, site_name } = ctx.body;
+    const { komari_url, probe_sources, site_name, smtp, sms_webhook, reg } = ctx.body;
 
     if (site_name !== undefined) {
       const v = String(site_name).trim().slice(0, 50);
       const row = db.find('settings', (s) => s.key === 'site_name');
       if (row) db.update('settings', row.id, { value: v });
       else db.insert('settings', { key: 'site_name', value: v });
+    }
+
+    // SMTP 配置 {host,port,secure,user,pass,from}
+    if (smtp !== undefined) {
+      if (smtp && smtp.host) {
+        if (!/^https?:\/\/|^[\w.-]+$/.test(smtp.host) || !smtp.from) {
+          return send(ctx, 400, { error: 'SMTP 配置不完整：需要服务器地址和发件人' });
+        }
+        const clean = {
+          host: String(smtp.host).trim(),
+          port: Number(smtp.port) || (smtp.secure ? 465 : 25),
+          secure: !!smtp.secure,
+          user: String(smtp.user || ''),
+          pass: String(smtp.pass || ''),
+          from: String(smtp.from).trim(),
+        };
+        settings.set('smtp', clean);
+      } else {
+        settings.set('smtp', {});
+      }
+    }
+
+    // 短信 webhook 通道
+    if (sms_webhook !== undefined) {
+      const v = String(sms_webhook).trim();
+      if (v && !/^https?:\/\//.test(v)) return send(ctx, 400, { error: '短信通道地址需以 http:// 或 https:// 开头' });
+      settings.set('sms_webhook', v);
+    }
+
+    // 注册开关 {requireInvite,verifyEmail,verifyPhone,qqBind}
+    if (reg !== undefined) {
+      const cur = settings.reg();
+      settings.set('reg', Object.assign(cur, {
+        requireInvite: !!(reg && reg.requireInvite),
+        verifyEmail: !!(reg && reg.verifyEmail),
+        verifyPhone: !!(reg && reg.verifyPhone),
+        qqBind: reg && reg.qqBind !== undefined ? !!reg.qqBind : cur.qqBind,
+      }));
     }
 
     if (komari_url !== undefined) {

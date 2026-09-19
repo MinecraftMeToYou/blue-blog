@@ -1,18 +1,23 @@
 // 评论：登录用户可对文章发表评论，作者可删除自己文章下的评论，本人可删自己的评论
 const db = require('../lib/db');
-const { send, requireLogin } = require('../lib/respond');
+const { send, requireLogin, requireActive } = require('../lib/respond');
+const levels = require('../lib/levels');
 
 function withUser(c) {
   const u = db.find('users', (x) => x.id === c.userId);
   return Object.assign({}, c, {
     username: u ? u.username : '未知用户',
     userTitle: u ? u.title : '',
+    userLevel: u ? u.level || 0 : 0,
+    userQQ: u ? u.qq || '' : '',
   });
 }
 
+module.exports.withUser = withUser;
+
 module.exports.register = (router) => {
   router.post('/api/posts/:id/comments', (ctx) => {
-    if (!requireLogin(ctx)) return;
+    if (!requireActive(ctx)) return;
     const post = db.find('posts', (p) => p.id === Number(ctx.params.id));
     if (!post) return send(ctx, 404, { error: '文章不存在' });
     const { content, replyTo } = ctx.body;
@@ -38,6 +43,7 @@ module.exports.register = (router) => {
       replyToName,
       createdAt: new Date().toISOString(),
     });
+    levels.refreshLevel(ctx.user.userId);
     send(ctx, 201, { comment: withUser(c) });
   });
 

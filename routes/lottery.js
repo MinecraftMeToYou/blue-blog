@@ -1,6 +1,6 @@
 // 抽奖系统：花金币抽奖，随机获得金币或专属头衔
 const db = require('../lib/db');
-const { send, requireLogin } = require('../lib/respond');
+const { send, requireLogin, requireActive } = require('../lib/respond');
 
 const COST = 20;
 // 权重总和恰好为 100，可直接当百分比展示
@@ -28,7 +28,7 @@ module.exports.register = (router) => {
 
   // 抽一次
   router.post('/api/lottery/draw', (ctx) => {
-    if (!requireLogin(ctx)) return;
+    if (!requireActive(ctx)) return;
     const user = db.find('users', (u) => u.id === ctx.user.userId);
     if (user.coins < COST) return send(ctx, 400, { error: `金币不足，抽奖需要 ${COST} 金币` });
     const prize = draw();

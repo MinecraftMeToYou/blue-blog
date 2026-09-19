@@ -161,6 +161,9 @@ tr.topic-row:hover { background: var(--hover); }
 .d-post-body { white-space: pre-wrap; line-height: 1.65; word-break: break-word; }
 .reply-quote { background: #eef3f7; color: #666; padding: 1px 8px; border-radius: 3px; font-size: 12px; }
 .title-badge { background: #fdf2d0; color: #8a6d3b; padding: 1px 8px; border-radius: 3px; font-size: 12px; }
+.lv-badge { border: 1px solid #ccc; border-radius: 999px; padding: 0 8px; font-size: 11px; line-height: 16px; white-space: nowrap; }
+.qq-badge { color: #12b7f5; font-size: 12px; }
+.p-sec { margin: 16px 0 4px; font-size: 14px; }
 
 .composer { margin: 20px 0 40px; }
 

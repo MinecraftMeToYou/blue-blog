@@ -1,6 +1,6 @@
 // 商店系统：用金币购买物品，购买记录可查
 const db = require('../lib/db');
-const { send, requireLogin } = require('../lib/respond');
+const { send, requireLogin, requireActive } = require('../lib/respond');
 
 module.exports.register = (router) => {
   // 商品列表
@@ -10,7 +10,7 @@ module.exports.register = (router) => {
 
   // 购买
   router.post('/api/shop/:id/buy', (ctx) => {
-    if (!requireLogin(ctx)) return;
+    if (!requireActive(ctx)) return;
     const item = db.find('shopItems', (i) => i.id === Number(ctx.params.id));
     if (!item) return send(ctx, 404, { error: '商品不存在' });
     const user = db.find('users', (u) => u.id === ctx.user.userId);

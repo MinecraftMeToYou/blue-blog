@@ -105,26 +105,44 @@ $('moreMenu').querySelectorAll('button').forEach((b) =>
   b.addEventListener('click', () => closeMore()));
 
 // ---- 认证 ----
+let SITE_REG = { requireInvite: false, verifyEmail: false, verifyPhone: false, qqBind: true };
 async function refreshMe() {
   try { me = (await api('/api/me')).user; }
   catch { me = null; }
   renderUserBox();
 }
 
+const LEVEL_META = [
+  ['L0 新用户', '#919191'], ['L1 基础用户', '#2e9ce0'], ['L2 成员', '#8dc63f'],
+  ['L3 活跃用户', '#9b59b6'], ['L4 领袖', '#e7c04a'],
+];
+function levelBadge(level) {
+  const [name, color] = LEVEL_META[level] || LEVEL_META[0];
+  return `<span class="lv-badge" style="border-color:${color};color:${color}">${name}</span>`;
+}
+
 function renderUserBox() {
   const box = $('userBox');
   $('navAuth').classList.toggle('hidden', !!me);
   $('btnNewPost').classList.toggle('hidden', !me);
-  if (!me) $('editorCard').classList.add('hidden');
+  $('profileBox').classList.toggle('hidden', !me);
+  $('authForms').classList.toggle('hidden', !!me);
+  $('btnNewPost').classList.add('hidden');
   if (me) {
-    box.innerHTML = `<button class="user-btn">${avatar(me.username, 26)}<b>${esc(me.username)}</b><span class="u-coins">${me.coins} 金币</span><span class="u-quit">退出</span></button>`;
-    box.querySelector('button').onclick = async () => {
-      await api('/api/logout', { method: 'POST' });
-      me = null; renderUserBox(); showTab('posts');
-    };
+    $('btnNewPost').classList.remove('hidden');
+    box.innerHTML = `<button class="user-btn" title="个人设置">${avatar(me.username, 26)}<b>${esc(me.username)}</b><span class="u-coins">${me.coins} 金币</span></button>`;
+    box.querySelector('button').onclick = () => openProfile();
+    fillProfile();
   } else {
     box.innerHTML = '';
   }
+}
+
+function renderAuthForm() {
+  document.querySelectorAll('.reg-extra').forEach((el) => el.classList.add('hidden'));
+  if (SITE_REG.verifyEmail) $('regEmailRow').classList.remove('hidden');
+  if (SITE_REG.verifyPhone) $('regPhoneRow').classList.remove('hidden');
+  if (SITE_REG.requireInvite) $('regInviteRow').classList.remove('hidden');
 }
 
 $('btnLogin').onclick = async () => {
@@ -136,8 +154,79 @@ $('btnLogin').onclick = async () => {
 
 $('btnRegister').onclick = async () => {
   try {
-    me = (await api('/api/register', { method: 'POST', body: { username: $('authUser').value, password: $('authPass').value } })).user;
-    renderUserBox(); showTab('posts');
+    const body = { username: $('authUser').value, password: $('authPass').value };
+    if (SITE_REG.verifyEmail) body.email = $('regEmail').value;
+    if (SITE_REG.verifyPhone) body.phone = $('regPhone').value;
+    if (SITE_REG.requireInvite) body.invite = $('regInvite').value;
+    const r = await api('/api/register', { method: 'POST', body });
+    me = r.user;
+    renderUserBox();
+    if (r.notices && r.notices.length) alert(r.notices.join('\n'));
+    else if (SITE_REG.verifyEmail || SITE_REG.verifyPhone) alert('注册成功！验证码已发送，请到「个人设置」完成验证');
+    showTab('posts');
+  } catch (e) { alert(e.message); }
+};
+
+// ---- 个人设置 ----
+function openProfile() {
+  showTab('auth');
+  renderAuthForm();
+}
+
+function fillProfile() {
+  if (!me) return;
+  $('profLevel').innerHTML = levelBadge(me.level);
+  $('profName').textContent = `${me.username} · ${me.coins} 金币` + (me.title ? ` · ${me.title}` : '');
+  $('profEmail').value = me.email || '';
+  $('profPhone').value = me.phone || '';
+  $('profQQ').value = me.qq || '';
+  $('profEmailState').textContent = me.emailVerified ? '✓ 已验证' : (me.email ? '未验证' : '');
+  $('profPhoneState').textContent = me.phoneVerified ? '✓ 已验证' : (me.phone ? '未验证' : '');
+  $('profQQState').textContent = me.qq ? '已绑定' : '';
+  const reg = SITE_REG;
+  $('profEmail').parentElement.parentElement.style.display = '';
+  if (!reg.qqBind) { $('qqSec').style.display = 'none'; $('qqRow').style.display = 'none'; }
+  else { $('qqSec').style.display = ''; $('qqRow').style.display = ''; }
+}
+
+$('btnProfLogout').onclick = async () => {
+  await api('/api/logout', { method: 'POST' });
+  me = null; renderUserBox(); showTab('posts');
+};
+$('btnBackForum').onclick = () => showTab('posts');
+
+$('btnProfQQ').onclick = async () => {
+  try {
+    const r = await api('/api/profile/qq', { method: 'PUT', body: { qq: $('profQQ').value } });
+    me = r.user; fillProfile();
+    $('profQQState').textContent = me.qq ? '已绑定' : '已清除';
+  } catch (e) { alert(e.message); }
+};
+
+$('btnProfEmailSend').onclick = async () => {
+  try {
+    const r = await api('/api/verify/email/send', { method: 'POST', body: { email: $('profEmail').value } });
+    $('profEmailState').textContent = r.hint || '已发送';
+  } catch (e) { $('profEmailState').textContent = e.message; }
+};
+$('btnProfEmailConfirm').onclick = async () => {
+  try {
+    const r = await api('/api/verify/email/confirm', { method: 'POST', body: { code: $('profEmailCode').value } });
+    me = r.user; renderUserBox(); openProfile();
+    $('profEmailState').textContent = '✓ 验证成功';
+  } catch (e) { alert(e.message); }
+};
+$('btnProfPhoneSend').onclick = async () => {
+  try {
+    const r = await api('/api/verify/phone/send', { method: 'POST', body: { phone: $('profPhone').value } });
+    $('profPhoneState').textContent = r.hint || '已发送';
+  } catch (e) { $('profPhoneState').textContent = e.message; }
+};
+$('btnProfPhoneConfirm').onclick = async () => {
+  try {
+    const r = await api('/api/verify/phone/confirm', { method: 'POST', body: { code: $('profPhoneCode').value } });
+    me = r.user; renderUserBox(); openProfile();
+    $('profPhoneState').textContent = '✓ 验证成功';
   } catch (e) { alert(e.message); }
 };
 
@@ -268,6 +357,7 @@ async function openPost(id) {
         <div class="d-post-main">
           <div class="d-post-info">
             <b>${esc(post.authorName)}</b>
+            ${levelBadge(post.authorLevel || 0)}
             <span class="p-time">#1 · ${timeAgo(post.createdAt)}</span>
             ${canEdit ? `<span class="p-ops"><button data-act="edit">编辑</button><button class="danger" data-act="del">删除</button></span>` : ''}
           </div>
@@ -280,7 +370,9 @@ async function openPost(id) {
         <div class="d-post-main">
           <div class="d-post-info">
             <b>${esc(c.username)}</b>
+            ${levelBadge(c.userLevel || 0)}
             ${c.userTitle ? `<span class="title-badge">${esc(c.userTitle)}</span>` : ''}
+            ${c.userQQ ? `<span class="qq-badge" title="QQ：${esc(c.userQQ)}">🐧 ${esc(c.userQQ)}</span>` : ''}
             ${c.replyTo ? `<span class="reply-quote">回复 @${esc(c.replyToName)}</span>` : ''}
             <span class="p-time">#${i + 2} · ${timeAgo(c.createdAt)}</span>
             <span class="p-ops">
@@ -667,11 +759,13 @@ $('btnThemeSave').onclick = async () => {
 };
 
 // ---- 启动 ----
-api('/api/site').then(({ name }) => {
+api('/api/site').then(({ name, reg }) => {
   if (name) {
     document.title = name;
     $('logoBtn').textContent = name;
   }
+  if (reg) SITE_REG = reg;
+  renderAuthForm();
 }).catch(() => {});
 api('/api/themes').then(({ themes: ts }) => {
   if (!ts.some((t) => t.id === appliedThemeId)) return applyTheme(1, '');

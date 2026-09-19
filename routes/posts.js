@@ -1,12 +1,14 @@
 // 文章增删改查 + 标签/分类筛选
 const db = require('../lib/db');
-const { send, requireLogin } = require('../lib/respond');
+const { send, requireLogin, requireActive } = require('../lib/respond');
+const levels = require('../lib/levels');
 const lotteryMod = require('./lottery');
 
 function withAuthor(post) {
   const author = db.find('users', (u) => u.id === post.authorId);
   return Object.assign({}, post, {
     authorName: author ? author.username : '佚名',
+    authorLevel: author ? author.level || 0 : 0,
     commentCount: db.filter('comments', (c) => c.postId === post.id).length,
   });
 }
@@ -28,7 +30,7 @@ module.exports.register = (router) => {
   router.get('/api/posts/:id', (ctx) => {
     const post = db.find('posts', (p) => p.id === Number(ctx.params.id));
     if (!post) return send(ctx, 404, { error: '文章不存在' });
-    const comments = db.filter('comments', (c) => c.postId === post.id);
+    const comments = db.filter('comments', (c) => c.postId === post.id).map(require('./comments').withUser);
     const lottery = db.find('lotteries', (l) => l.postId === post.id);
     send(ctx, 200, {
       post: withAuthor(post),
@@ -39,7 +41,8 @@ module.exports.register = (router) => {
 
   // 发布文章（需登录）
   router.post('/api/posts', (ctx) => {
-    if (!requireLogin(ctx)) return;
+    if (!requireActive(ctx)) return;
+    levels.refreshLevel(ctx.user.userId);
     const { title, content, tags, category } = ctx.body;
     if (!title || !content) return send(ctx, 400, { error: '需要标题和内容' });
     const post = db.insert('posts', {
