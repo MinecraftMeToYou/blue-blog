@@ -3,21 +3,26 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>blue-blog</title>
+<title>MinecraftMeToYou的私人博客</title>
 <link rel="stylesheet" href="/style.css">
 <style id="userTheme"></style>
 </head>
 <body>
 <header>
   <div class="wrap head-inner">
-    <button class="logo" onclick="showTab('posts')">blue-blog</button>
+    <button class="logo" id="logoBtn" onclick="showTab('posts')">MinecraftMeToYou的私人博客</button>
     <nav class="nav">
       <button data-tab="posts" class="active">文章</button>
-      <button data-tab="shop">商店</button>
-      <button data-tab="lottery">抽奖</button>
-      <button data-tab="mc">MC状态</button>
+      <div class="nav-drop" id="moreDrop">
+        <button id="btnMore">其他 ▾</button>
+        <div class="drop-menu hidden" id="moreMenu">
+          <button data-tab="shop">商店</button>
+          <button data-tab="lottery">抽奖</button>
+          <button data-tab="mc">MC状态</button>
+          <button data-tab="probe">机器状态</button>
+        </div>
+      </div>
       <button data-tab="themes">主题</button>
-      <button data-tab="probe">机器状态</button>
       <button id="navMachines" class="machchip" title="探针节点在线情况">--</button>
       <button data-tab="auth" id="navAuth">登录</button>
       <span id="userBox"></span>
@@ -47,6 +52,7 @@
         <button id="btnPublish" class="primary">发布</button>
         <button id="btnCancelEdit" class="hidden">取消</button>
       </div>
+      <p class="hint">正文中可用标记：[probe] 机器状态、[mc] MC状态、[lottery] 抽奖、[shop] 商店，发布后自动渲染成对应组件</p>
     </div>
     <p style="margin:16px 0"><button id="btnNewPost" class="primary hidden">+ 新话题</button></p>
   </section>
@@ -78,12 +84,10 @@
 
   <!-- 抽奖 -->
   <section id="lotteryPanel" class="hidden">
-    <div class="box" style="text-align:center">
+    <div class="box">
       <h3>抽奖</h3>
       <p class="hint">每次消耗 20 金币，抽中头衔会覆盖当前头衔</p>
-      <div id="poolList" class="pool"></div>
-      <button id="btnDraw" class="primary" style="font-size:15px;padding:10px 36px">抽一次（20 金币）</button>
-      <p id="drawResult" style="font-size:16px;margin-top:14px;min-height:1.5em"></p>
+      <div id="lotteryBody"></div>
     </div>
     <div class="box">
       <h3>我的抽奖记录</h3>
@@ -124,7 +128,7 @@
   </section>
 </div>
 
-<footer>Powered by blue-blog</footer>
+<footer>MinecraftMeToYou的私人博客</footer>
 <script src="/app.js"></script>
 </body>
 </html>

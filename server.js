@@ -34,6 +34,12 @@ lottery.register(router);
 themes.register(router);
 probe.register(router);
 
+// 公开的站点信息（站名在后台「设置」里改）
+router.get('/api/site', (ctx) => {
+  const row = db.find('settings', (s) => s.key === 'site_name');
+  send(ctx.res, 200, { name: (row && row.value) || 'MinecraftMeToYou的私人博客' });
+});
+
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',

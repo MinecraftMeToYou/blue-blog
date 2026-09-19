@@ -30,7 +30,29 @@ header {
   position: sticky; top: 0; z-index: 10;
 }
 .head-inner { display: flex; align-items: center; justify-content: space-between; height: 52px; gap: 10px; }
-.logo { background: none; border: 0; color: #fff; font-size: 18px; font-weight: 700; cursor: pointer; }
+.logo { background: none; border: 0; color: #fff; font-size: 16px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+
+/* 「其他」下拉 */
+.nav-drop { position: relative; }
+.drop-menu {
+  position: absolute; top: calc(100% + 4px); left: 0;
+  background: #fff; border: 1px solid var(--line); border-radius: 4px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .12);
+  min-width: 130px; padding: 4px 0; z-index: 30;
+}
+.nav-drop.open .drop-menu { display: block; }
+.drop-menu button {
+  display: block; width: 100%; text-align: left;
+  background: #fff; color: #333; border-radius: 0; padding: 8px 16px;
+}
+.drop-menu button:hover { background: var(--hover); color: var(--blue); filter: none; }
+
+/* 文章内嵌组件 */
+.embed { border: 1px solid var(--line); border-radius: 5px; margin: 12px 0; overflow: hidden; }
+.embed-label { background: #f5f6f7; border-bottom: 1px solid var(--line); padding: 5px 12px; font-size: 12px; color: var(--muted); }
+.embed-body { padding: 12px 14px; }
+.embed-body .box:first-child { margin-top: 0; }
+.embed-center { text-align: center; margin-top: 10px; }
 .nav { display: flex; gap: 2px; align-items: center; flex-wrap: wrap; }
 .nav button {
   background: none; border: 0; color: #cfd6de; padding: 8px 12px;

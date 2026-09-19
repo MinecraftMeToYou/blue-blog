@@ -53,6 +53,18 @@ let srcList = [];
 
 async function loadSettings() {
   const { settings } = await api('/api/admin/settings');
+
+  // 站名
+  const defName = 'MinecraftMeToYou的私人博客';
+  $('siteNameInput').value = settings.site_name || defName;
+  $('btnSaveSite').onclick = async () => {
+    try {
+      await api('/api/admin/settings', { method: 'PUT', body: { site_name: $('siteNameInput').value } });
+      $('siteMsg').textContent = '已保存';
+      setTimeout(() => ($('siteMsg').textContent = ''), 2000);
+    } catch (e) { $('siteMsg').textContent = e.message; }
+  };
+
   srcList = [];
   try {
     const p = settings.probe_sources ? JSON.parse(settings.probe_sources) : null;

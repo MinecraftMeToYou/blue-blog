@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>blue-blog 后台</title>
+<title>后台 · MinecraftMeToYou的私人博客</title>
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 <header>
   <div class="wrap head-inner">
-    <button class="logo" onclick="location.reload()">blue-blog 后台</button>
+    <button class="logo" onclick="location.reload()">博客后台</button>
     <nav class="nav hidden" id="tabs">
       <button data-tab="overview" class="active">概览</button>
       <button data-tab="posts">文章</button>
@@ -41,6 +41,13 @@
     <div id="tabShop" class="hidden"></div>
     <div id="tabSettings" class="hidden">
       <div class="box" style="margin-top:20px">
+        <h3>站点</h3>
+        <p class="hint">站点名称，显示在导航栏和浏览器标题</p>
+        <input id="siteNameInput" placeholder="站点名称">
+        <div class="row"><button id="btnSaveSite" class="primary">保存站名</button></div>
+        <p class="hint" id="siteMsg"></p>
+      </div>
+      <div class="box">
         <h3>探针数据源</h3>
         <p class="hint">支持 komari、哪吒（Nezha v0）、ServerStatus（Hotaru）。可同时添加多个面板。</p>
         <div id="srcRows"></div>

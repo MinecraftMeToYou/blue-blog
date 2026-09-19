@@ -136,7 +136,14 @@ module.exports.register = (router) => {
 
   router.put('/api/admin/settings', (ctx) => {
     if (!requireAdmin(ctx)) return;
-    const { komari_url, probe_sources } = ctx.body;
+    const { komari_url, probe_sources, site_name } = ctx.body;
+
+    if (site_name !== undefined) {
+      const v = String(site_name).trim().slice(0, 50);
+      const row = db.find('settings', (s) => s.key === 'site_name');
+      if (row) db.update('settings', row.id, { value: v });
+      else db.insert('settings', { key: 'site_name', value: v });
+    }
 
     if (komari_url !== undefined) {
       const v = String(komari_url).trim();

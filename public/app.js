@@ -21,7 +21,6 @@ function esc(s) {
   return d.innerHTML;
 }
 
-// 相对时间：刚发帖显示“x 分钟”，更早显示日期
 function timeAgo(iso) {
   const s = (Date.now() - new Date(iso).getTime()) / 1000;
   if (s < 60) return '刚刚';
@@ -47,14 +46,41 @@ function catColor(name) {
   return AV_COLORS[h % AV_COLORS.length];
 }
 
+// ---- 正文标记渲染：[probe] [mc] [lottery] [shop] ----
+const EMBEDS = { probe: '机器状态', mc: 'MC状态', lottery: '抽奖', shop: '商店' };
+function renderContent(content) {
+  const widgets = [];
+  const html = esc(content).replace(/\[(probe|mc|lottery|shop)\]/gi, (_, name) => {
+    const key = name.toLowerCase();
+    const id = `w-${key}-${widgets.length}`;
+    widgets.push({ id, key });
+    return `<div class="embed" id="${id}"><div class="embed-label">${EMBEDS[key]}</div><div class="embed-body"></div></div>`;
+  });
+  return { html, widgets };
+}
+function mountWidgets(widgets) {
+  for (const w of widgets) {
+    const box = document.getElementById(w.id);
+    if (!box) continue;
+    const body = box.querySelector('.embed-body');
+    if (w.key === 'probe') renderProbeInto(body);
+    else if (w.key === 'mc') renderMcInto(body);
+    else if (w.key === 'lottery') renderLotteryInto(body);
+    else if (w.key === 'shop') renderShopInto(body);
+  }
+}
+
 // ---- 标签页切换 ----
 const panels = ['authPanel', 'postsPanel', 'postDetail', 'shopPanel', 'lotteryPanel', 'mcPanel', 'themesPanel', 'probePanel'];
+const MORE_TABS = ['shop', 'lottery', 'mc', 'probe'];
 function showTab(name) {
   panels.forEach((p) => $(p).classList.add('hidden'));
   const map = { posts: 'postsPanel', shop: 'shopPanel', mc: 'mcPanel', auth: 'authPanel', lottery: 'lotteryPanel', themes: 'themesPanel', probe: 'probePanel' };
   $(map[name]).classList.remove('hidden');
   document.querySelectorAll('.nav button[data-tab]').forEach((b) =>
     b.classList.toggle('active', b.dataset.tab === name));
+  $('btnMore').classList.toggle('active', MORE_TABS.includes(name));
+  closeMore();
   if (name === 'posts') loadPosts();
   if (name === 'shop') loadShop();
   if (name === 'lottery') loadLottery();
@@ -64,6 +90,19 @@ function showTab(name) {
 }
 document.querySelectorAll('.nav button[data-tab]').forEach((b) =>
   b.addEventListener('click', () => showTab(b.dataset.tab)));
+
+// 「其他」下拉菜单
+function closeMore() { $('moreDrop').classList.remove('open'); $('moreMenu').classList.add('hidden'); }
+$('btnMore').onclick = (e) => {
+  e.stopPropagation();
+  const open = $('moreDrop').classList.toggle('open');
+  $('moreMenu').classList.toggle('hidden', !open);
+};
+document.addEventListener('click', (e) => {
+  if (!$('moreDrop').contains(e.target)) closeMore();
+});
+$('moreMenu').querySelectorAll('button').forEach((b) =>
+  b.addEventListener('click', () => closeMore()));
 
 // ---- 认证 ----
 async function refreshMe() {
@@ -210,6 +249,8 @@ async function openPost(id) {
     return '';
   }
 
+  const { html: postHtml, widgets } = renderContent(post.content);
+
   $('postDetail').innerHTML = `
     <div class="topic-head">
       <button class="link-btn" onclick="showTab('posts')">← 返回列表</button>
@@ -230,7 +271,7 @@ async function openPost(id) {
             <span class="p-time">#1 · ${timeAgo(post.createdAt)}</span>
             ${canEdit ? `<span class="p-ops"><button data-act="edit">编辑</button><button class="danger" data-act="del">删除</button></span>` : ''}
           </div>
-          <div class="d-post-body">${esc(post.content)}</div>
+          <div class="d-post-body">${postHtml}</div>
         </div>
       </div>
       ${comments.map((c, i) => `
@@ -260,6 +301,9 @@ async function openPost(id) {
 
   panels.forEach((p) => $(p).classList.add('hidden'));
   $('postDetail').classList.remove('hidden');
+
+  // 渲染正文里的功能组件
+  mountWidgets(widgets);
 
   // 抽奖按钮
   const joinBtn = $('btnJoinLottery');
@@ -327,22 +371,32 @@ async function openPost(id) {
   });
 }
 
-// ---- 商店 ----
-async function loadShop() {
-  const { items } = await api('/api/shop');
-  $('shopCoins').textContent = me ? `我的金币：${me.coins}` : '登录后可购买';
-  $('shopList').innerHTML = items.map((i) => `
+// ---- 商店（可嵌入） ----
+async function renderShopInto(el) {
+  el.innerHTML = '<p class="hint">加载中...</p>';
+  let items;
+  try { items = (await api('/api/shop')).items; }
+  catch (e) { el.innerHTML = `<p class="hint">${esc(e.message)}</p>`; return; }
+  el.innerHTML = items.map((i) => `
     <div class="box shop-item">
       <div><b>${esc(i.name)}</b><p class="hint">${esc(i.desc)}</p></div>
       <div class="shop-buy">${i.price} 金币 <button class="primary" data-id="${i.id}">购买</button></div>
-    </div>`).join('');
-  $('shopList').querySelectorAll('button[data-id]').forEach((b) =>
+    </div>`).join('') || '<p class="hint">商店暂无商品</p>';
+  el.querySelectorAll('button[data-id]').forEach((b) =>
     b.onclick = async () => {
       try {
         const r = await api(`/api/shop/${b.dataset.id}/buy`, { method: 'POST' });
-        me.coins = r.coins; renderUserBox(); loadShop();
+        me = r.user || me;
+        if (r.coins !== undefined && me) me.coins = r.coins;
+        renderUserBox();
+        renderShopInto(el);
       } catch (e) { alert(e.message); }
     });
+}
+
+async function loadShop() {
+  $('shopCoins').textContent = me ? `我的金币：${me.coins}` : '登录后可购买';
+  await renderShopInto($('shopList'));
   if (me) {
     const { orders } = await api('/api/purchases');
     $('orderList').innerHTML = orders.map((o) =>
@@ -350,13 +404,34 @@ async function loadShop() {
   } else $('orderList').innerHTML = '';
 }
 
-// ---- 抽奖 ----
-let poolLabels = [];
+// ---- 抽奖（可嵌入） ----
+async function renderLotteryInto(el, opts = {}) {
+  el.innerHTML = '<p class="hint">加载中...</p>';
+  let pool;
+  try { pool = (await api('/api/lottery')).pool; }
+  catch (e) { el.innerHTML = `<p class="hint">${esc(e.message)}</p>`; return; }
+  el.innerHTML = `
+    <div class="pool">${pool.map((p) => `<span class="mini-tag">${esc(p.label)} ${p.weight}%</span>`).join('')}</div>
+    <p class="embed-center"><button class="primary">${me ? '抽一次（20 金币）' : '登录后可抽奖'}</button></p>
+    <p class="hint w-result"></p>`;
+  const result = el.querySelector('.w-result');
+  const drawBtn = el.querySelector('button.primary');
+  drawBtn.onclick = async () => {
+    if (!me) return showTab('auth');
+    try {
+      drawBtn.disabled = true;
+      result.textContent = '抽奖中...';
+      const r = await api('/api/lottery/draw', { method: 'POST' });
+      result.textContent = `恭喜获得：${r.prize}`;
+      refreshMe();
+      if (opts.onSuccess) opts.onSuccess(r);
+    } catch (e) { result.textContent = e.message; }
+    drawBtn.disabled = false;
+  };
+}
+
 async function loadLottery() {
-  const { pool } = await api('/api/lottery');
-  poolLabels = pool.map((p) => p.label);
-  $('poolList').innerHTML = pool.map((p) =>
-    `<span class="mini-tag pool-item">${esc(p.label)} ${p.weight}%</span>`).join('');
+  await renderLotteryInto($('lotteryBody'), { onSuccess: () => loadDrawHistory() });
   loadDrawHistory();
 }
 
@@ -368,45 +443,16 @@ async function loadDrawHistory() {
     || '<p class="hint">暂无记录</p>';
 }
 
-$('btnDraw').onclick = async () => {
-  try {
-    $('btnDraw').disabled = true;
-    $('drawResult').textContent = '抽奖中...';
-    const r = await api('/api/lottery/draw', { method: 'POST' });
-    let i = 0;
-    const timer = setInterval(() => {
-      $('drawResult').textContent = poolLabels[i++ % poolLabels.length];
-    }, 80);
-    setTimeout(() => {
-      clearInterval(timer);
-      $('drawResult').textContent = `恭喜获得：${r.prize}`;
-      $('btnDraw').disabled = false;
-      refreshMe();
-      loadDrawHistory();
-    }, 900);
-  } catch (e) {
-    $('drawResult').textContent = e.message;
-    $('btnDraw').disabled = false;
-  }
-};
-
 // ---- 导航栏机器状态（与探针同步，30s 刷新） ----
-let probeTimer = null;
 async function syncMachines() {
   const chip = $('navMachines');
   try {
     const d = await api('/api/probe/servers');
-    if (!d.configured) { chip.textContent = '未配置'; chip.className = 'machchip off'; }
-    else if (d.error || (d.sources || []).some((s) => !s.ok)) {
-      const total = d.servers.length, online = d.servers.filter((s) => s.online).length;
-      chip.textContent = `${online}/${total}`;
-      chip.className = 'machchip ' + (total && online === total ? 'ok' : 'off');
-    } else {
-      const total = d.servers.length;
-      const online = d.servers.filter((s) => s.online).length;
-      chip.textContent = `${online}/${total}`;
-      chip.className = 'machchip ' + (online === 0 ? 'off' : online < total ? 'warn' : 'ok');
-    }
+    if (!d.configured) { chip.textContent = '未配置'; chip.className = 'machchip off'; return; }
+    const total = d.servers.length;
+    const online = d.servers.filter((s) => s.online).length;
+    chip.textContent = `${online}/${total}`;
+    chip.className = 'machchip ' + (online === 0 ? 'off' : online < total ? 'warn' : 'ok');
   } catch {
     chip.textContent = '--';
     chip.className = 'machchip off';
@@ -414,9 +460,9 @@ async function syncMachines() {
 }
 $('navMachines').onclick = () => { showTab('probe'); syncMachines(); };
 syncMachines();
-probeTimer = setInterval(syncMachines, 30000);
+setInterval(syncMachines, 30000);
 
-// ---- 机器状态页（多数据源分组展示） ----
+// ---- 机器状态（可嵌入） ----
 function fmtBytes(n) {
   if (!n) return '0 B/s';
   const u = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
@@ -450,37 +496,51 @@ function serverCard(s) {
   </div>`;
 }
 
-async function loadProbe() {
-  $('probeHint').textContent = '加载中...';
-  const d = await api('/api/probe/servers');
+async function renderProbeInto(el, hintEl) {
+  el.innerHTML = '<p class="hint">加载中...</p>';
+  let d;
+  try { d = await api('/api/probe/servers'); }
+  catch (e) { el.innerHTML = `<p class="hint">${esc(e.message)}</p>`; return; }
   if (!d.configured) {
-    $('probeHint').textContent = d.hint || '未配置探针';
-    $('probeList').innerHTML = '';
+    if (hintEl) hintEl.textContent = d.hint || '未配置探针';
+    el.innerHTML = '<p class="hint">未配置探针数据源，管理员可在后台「设置」里添加 komari / 哪吒 / ServerStatus</p>';
     return;
   }
   const bad = (d.sources || []).filter((s) => !s.ok).map((s) => s.name);
-  $('probeHint').textContent = bad.length
+  if (hintEl) hintEl.textContent = bad.length
     ? `部分数据源异常：${bad.join('、')}`
     : `已接入 ${d.sources.length} 个探针面板，共 ${d.servers.length} 个节点`;
-  $('probeList').innerHTML = (d.sources || []).map((src) => `
+  el.innerHTML = (d.sources || []).map((src) => `
     <h3 class="sec-title">${esc(src.name)} <span class="mini-tag">${esc(src.provider)}</span>
       ${src.ok ? '' : `<span class="src-err">${esc(src.error || '获取失败')}</span>`}</h3>
     ${src.ok ? (src.servers.map(serverCard).join('') || '<p class="hint">暂无节点</p>') : ''}
   `).join('');
 }
+
+async function loadProbe() {
+  $('probeHint').textContent = '加载中...';
+  await renderProbeInto($('probeList'), $('probeHint'));
+}
 $('btnRefreshProbe').onclick = loadProbe;
 
-// ---- MC 状态 ----
-async function loadMc() {
-  $('mcList').innerHTML = '<p class="hint">查询中...</p>';
-  const { servers } = await api('/api/mc');
-  $('mcList').innerHTML = servers.map((s) => `
+// ---- MC 状态（可嵌入） ----
+async function renderMcInto(el) {
+  el.innerHTML = '<p class="hint">查询中...</p>';
+  let servers;
+  try { servers = (await api('/api/mc')).servers; }
+  catch (e) { el.innerHTML = `<p class="hint">${esc(e.message)}</p>`; return; }
+  el.innerHTML = servers.map((s) => `
     <div class="box mc-card">
       <div><b><span class="dot ${s.online ? 'on' : 'off'}"></span>${esc(s.host)}:${s.port}</b>
         ${s.online ? `<p class="hint">${esc(s.motd)} · 版本 ${esc(s.version)}</p>` : '<p class="hint">服务器离线或未开启 Query</p>'}
       </div>
       ${s.online ? `<div style="font-size:1.4rem">${s.players}<small>/${s.maxPlayers}</small></div>` : ''}
-    </div>`).join('');
+    </div>`).join('') || '<p class="hint">未配置服务器</p>';
+}
+
+async function loadMc() {
+  $('mcList').innerHTML = '<p class="hint">查询中...</p>';
+  await renderMcInto($('mcList'));
 }
 $('btnRefreshMc').onclick = loadMc;
 
@@ -585,6 +645,12 @@ $('btnThemeSave').onclick = async () => {
 };
 
 // ---- 启动 ----
+api('/api/site').then(({ name }) => {
+  if (name) {
+    document.title = name;
+    $('logoBtn').textContent = name;
+  }
+}).catch(() => {});
 api('/api/themes').then(({ themes: ts }) => {
   if (!ts.some((t) => t.id === appliedThemeId)) applyTheme(1, '');
 }).catch(() => {});
