@@ -459,6 +459,7 @@ async function syncMachines() {
   }
 }
 $('navMachines').onclick = () => { showTab('probe'); syncMachines(); };
+$('navDayNight').onclick = toggleDayNight;
 syncMachines();
 setInterval(syncMachines, 30000);
 
@@ -554,10 +555,31 @@ function applyTheme(id, css) {
   appliedThemeId = id;
   localStorage.setItem('themeId', id);
   localStorage.setItem('themeCSS', css || '');
+  renderDayNight();
+}
+
+// ---- 白天/夜晚一键切换（夜晚=预置暗色主题 id 2，白天=默认亮色 id 1） ----
+const NIGHT_THEME_ID = 2;
+function renderDayNight() {
+  const btn = $('navDayNight');
+  if (!btn) return;
+  const isNight = appliedThemeId === NIGHT_THEME_ID;
+  btn.textContent = isNight ? '☀️ 白天' : '🌙 夜晚';
+  btn.title = isNight ? '切回白天（亮色）' : '切换到夜晚（暗色）';
+}
+
+async function toggleDayNight() {
+  const targetId = appliedThemeId === NIGHT_THEME_ID ? 1 : NIGHT_THEME_ID;
+  try {
+    const ts = (await api('/api/themes')).themes;
+    const t = ts.find((x) => x.id === targetId);
+    if (t) applyTheme(t.id, t.css);
+  } catch (e) { alert(e.message); }
 }
 
 (function bootTheme() {
   $('userTheme').textContent = localStorage.getItem('themeCSS') || '';
+  renderDayNight();
 })();
 
 async function loadThemes() {
@@ -652,6 +674,9 @@ api('/api/site').then(({ name }) => {
   }
 }).catch(() => {});
 api('/api/themes').then(({ themes: ts }) => {
-  if (!ts.some((t) => t.id === appliedThemeId)) applyTheme(1, '');
+  if (!ts.some((t) => t.id === appliedThemeId)) return applyTheme(1, '');
+  // 缓存的主题 CSS 与服务器不一致时自动更新（主题被作者改过）
+  const t = ts.find((x) => x.id === appliedThemeId);
+  if (t && t.css !== (localStorage.getItem('themeCSS') || '')) applyTheme(t.id, t.css);
 }).catch(() => {});
 refreshMe().then(() => showTab('posts'));

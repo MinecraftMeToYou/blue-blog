@@ -41,11 +41,15 @@ header {
   min-width: 130px; padding: 4px 0; z-index: 30;
 }
 .nav-drop.open .drop-menu { display: block; }
-.drop-menu button {
+/* 提高优先级，避免被 .nav button 的浅灰字覆盖导致白底看不清 */
+.nav .nav-drop .drop-menu button {
   display: block; width: 100%; text-align: left;
-  background: #fff; color: #333; border-radius: 0; padding: 8px 16px;
+  background: #fff; color: #333; border-radius: 0; padding: 8px 16px; font-size: 14px;
 }
-.drop-menu button:hover { background: var(--hover); color: var(--blue); filter: none; }
+.nav .nav-drop .drop-menu button:hover { background: var(--hover); color: var(--blue); filter: none; }
+
+/* 白天/夜晚切换按钮 */
+.daynight { font-size: 15px !important; }
 
 /* 文章内嵌组件 */
 .embed { border: 1px solid var(--line); border-radius: 5px; margin: 12px 0; overflow: hidden; }
